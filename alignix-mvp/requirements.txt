@@ -1,0 +1,5 @@
+streamlit
+azure-storage-blob
+pathlib
+datetime
+sqlite3
