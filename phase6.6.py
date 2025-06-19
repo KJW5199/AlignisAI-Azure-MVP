@@ -1,5 +1,5 @@
 # Azure-Ready Streamlit MVP with Login, Roles, and Azure Blob Integration
-# Redeploy after fixing ACR auth
+# Trigger final deploy to Web App
 
 import streamlit as st
 import sqlite3
