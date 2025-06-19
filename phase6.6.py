@@ -1,4 +1,5 @@
 # Azure-Ready Streamlit MVP with Login, Roles, and Azure Blob Integration
+# Triggering GitHub deployment
 
 import streamlit as st
 import sqlite3
