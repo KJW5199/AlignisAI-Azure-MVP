@@ -1,5 +1,5 @@
 # Azure-Ready Streamlit MVP with Login, Roles, and Azure Blob Integration
-# trigger redeploy
+# Final deploy attempt with validated credentials
 
 import streamlit as st
 import sqlite3
