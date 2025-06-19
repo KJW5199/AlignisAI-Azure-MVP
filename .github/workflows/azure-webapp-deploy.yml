@@ -1,0 +1,44 @@
+name: Azure Web App Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AZURE_WEBAPP_NAME: alignix-mvp-app
+  AZURE_WEBAPP_PACKAGE_PATH: '.'
+  DOCKER_REGISTRY_SERVER_URL: 'https://alignixacr.azurecr.io'
+  IMAGE_NAME: alignixmvp
+  AZURE_RESOURCE_GROUP: alignix-rg
+  CONTAINER_REGISTRY: alignixacr
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build and push Docker image to ACR
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ env.CONTAINER_REGISTRY }}.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - run: |
+          docker build -t $CONTAINER_REGISTRY.azurecr.io/$IMAGE_NAME:${{ github.sha }} .
+          docker push $CONTAINER_REGISTRY.azurecr.io/$IMAGE_NAME:${{ github.sha }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          images: ${{ env.CONTAINER_REGISTRY }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
