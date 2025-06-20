@@ -57,7 +57,7 @@ container_name = "policy-files"
 container_client = blob_service_client.get_container_client(container_name)
 
 # --- SUMMARIZATION MODEL ---
-summarizer = pipeline("summarization")
+summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6")
 
 # --- SIDEBAR MENU ---
 role = st.session_state.role
@@ -91,18 +91,7 @@ if choice == "Dashboard":
     except Exception as e:
         st.error(f"Error fetching policies: {e}")
 
-# --- POLICY UPLOAD ---
-elif choice == "Upload Policies" and role in ["Admin", "Editor"]:
-    st.header("📤 Upload New Policy")
-    uploaded_file = st.file_uploader("Choose a .txt policy file", type="txt")
-    if uploaded_file:
-        container_client.upload_blob(uploaded_file.name, uploaded_file, overwrite=True)
-        timestamp = datetime.datetime.now().isoformat()
-        c.execute("INSERT INTO audit_log VALUES (?, ?)", (f"Uploaded policy: {uploaded_file.name}", timestamp))
-        conn.commit()
-        st.success("Policy uploaded successfully.")
-
-# --- AI SUMMARY AND TRAINING ---
+# --- AI SUMMARY & TRAINING ---
 elif choice == "AI Summary & Training":
     st.header("🧠 AI Summary & Training Generator")
     blobs = container_client.list_blobs()
@@ -120,7 +109,6 @@ elif choice == "AI Summary & Training":
             else:
                 st.text_area("Policy Text:", value=policy_text, height=200, disabled=True)
 
-            # Generate AI summary and key takeaways from policy
             with st.spinner("Generating AI Summary..."):
                 try:
                     summary = summarizer(policy_text, max_length=120, min_length=30, do_sample=False)[0]['summary_text']
@@ -129,7 +117,7 @@ elif choice == "AI Summary & Training":
 
             st.text_area("AI-Generated Summary & Key Takeaways:", value=summary, height=150, disabled=True, key=f"summary_{blob.name}")
 
-            assign_to = st.selectbox("Assign to:", ["admin", "editor", "analyst"], key=f"user_{blob.name}")
+            assign_to = st.selectbox("Assign to:", list(users.keys()), key=f"user_{blob.name}")
             if st.button(f"Assign Training - {blob.name}", key=f"btn_{blob.name}"):
                 timestamp = datetime.datetime.now().isoformat()
                 due = (datetime.date.today() + datetime.timedelta(days=7)).isoformat()
@@ -152,14 +140,14 @@ elif choice == "User Portal":
             q2 = st.radio("2. Who must comply with the policy?", ["Executives only", "Everyone", "No one"], key=f"{mod}_q2")
             q3 = st.radio("3. When is the review due?", ["Monthly", "Annually", "Never"], key=f"{mod}_q3")
             score = sum([q1 == "Policy enforcement", q2 == "Everyone", q3 == "Annually"])
-            if score >= 2:
-                if st.button(f"Mark Completed - {mod}"):
+            if st.button(f"Submit Quiz - {mod}"):
+                if score >= 2:
                     c.execute("UPDATE training_status SET status = 'Completed', score = ? WHERE user = ? AND module = ?", (score, username, mod))
                     c.execute("INSERT INTO audit_log VALUES (?, ?)", (f"{username} completed {mod} with score {score}/3", datetime.datetime.now().isoformat()))
                     conn.commit()
                     st.success(f"Marked {mod} as completed.")
-            else:
-                st.warning("You need 2 or more correct answers to pass.")
+                else:
+                    st.warning("You need 2 or more correct answers to pass.")
 
 # --- AUDIT LOG ---
 elif choice == "Audit Log":
