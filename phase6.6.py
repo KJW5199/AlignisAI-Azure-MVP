@@ -41,7 +41,7 @@ if st.sidebar.button("Logout"):
     st.session_state.logged_in = False
     st.session_state.role = None
     st.session_state.username = None
-    st.rerun()
+    st.experimental_rerun()
 
 # --- DATABASE SETUP ---
 conn = sqlite3.connect("kyc_training.db", check_same_thread=False)
@@ -57,7 +57,7 @@ container_name = "policy-files"
 container_client = blob_service_client.get_container_client(container_name)
 
 # --- SUMMARIZATION MODEL ---
-summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6")
+summarizer = pipeline("summarization", model="philschmid/bart-large-cnn-samsum")
 
 # --- SIDEBAR MENU ---
 role = st.session_state.role
@@ -87,7 +87,7 @@ if choice == "Dashboard":
                     c.execute("INSERT INTO audit_log VALUES (?, ?)", (f"Deleted policy: {blob.name}", datetime.datetime.now().isoformat()))
                     conn.commit()
                     st.success(f"{blob.name} has been deleted.")
-                    st.rerun()
+                    st.experimental_rerun()
     except Exception as e:
         st.error(f"Error fetching policies: {e}")
 
