@@ -51,7 +51,7 @@ c.execute('''CREATE TABLE IF NOT EXISTS training_status (user TEXT, role TEXT, m
 conn.commit()
 
 # --- AZURE BLOB SETUP ---
-AZURE_CONNECTION_STRING = os.environ["AZURE_CONNECTION_STRING"]
+AZURE_CONNECTION_STRING = os.environ.get("AZURE_CONNECTION_STRING")
 blob_service_client = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
 container_name = "policy-files"
 container_client = blob_service_client.get_container_client(container_name)
@@ -81,6 +81,13 @@ if choice == "Dashboard":
         blobs = container_client.list_blobs()
         for blob in blobs:
             st.text(f"{blob.name} — Uploaded {blob.last_modified.strftime('%Y-%m-%d %H:%M:%S')}")
+            if role == "Admin":
+                if st.button(f"❌ Delete {blob.name}", key=f"delete_{blob.name}"):
+                    container_client.delete_blob(blob.name)
+                    c.execute("INSERT INTO audit_log VALUES (?, ?)", (f"Deleted policy: {blob.name}", datetime.datetime.now().isoformat()))
+                    conn.commit()
+                    st.success(f"{blob.name} has been deleted.")
+                    st.rerun()
     except Exception as e:
         st.error(f"Error fetching policies: {e}")
 
