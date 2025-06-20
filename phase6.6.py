@@ -100,8 +100,15 @@ elif choice == "AI Summary & Training":
             st.markdown(f"### 📄 {blob.name}")
             blob_client = container_client.get_blob_client(blob.name)
             policy_text = blob_client.download_blob().readall().decode("utf-8")
-            st.text_area("Policy Text:", value=policy_text, height=200, disabled=(role not in ["Admin", "Editor"]))
-            editable_summary = st.text_area("AI-Generated Summary & Key Takeaways:", value="(Enter summary here)", height=150, disabled=(role not in ["Admin", "Editor"]), key=f"summary_{blob.name}")
+            if role in ["Admin", "Editor"]:
+                edited_text = st.text_area("Edit Policy Text:", value=policy_text, height=200, key=f"edit_{blob.name}")
+                if st.button("Save Changes", key=f"save_{blob.name}"):
+                    container_client.upload_blob(blob.name, edited_text.encode("utf-8"), overwrite=True)
+                    st.success("Changes saved.")
+            else:
+                st.text_area("Policy Text:", value=policy_text, height=200, disabled=True)
+
+            editable_summary = st.text_area("AI-Generated Summary & Key Takeaways:", value="Bullet points of key takeaways go here...", height=150, disabled=(role not in ["Admin", "Editor"]), key=f"summary_{blob.name}")
             assign_to = st.selectbox("Assign to:", ["admin", "editor", "analyst"], key=f"user_{blob.name}")
             if st.button(f"Assign Training - {blob.name}", key=f"btn_{blob.name}"):
                 timestamp = datetime.datetime.now().isoformat()
@@ -121,9 +128,9 @@ elif choice == "User Portal":
         st.markdown(f"**{mod}** — *{stat}*, Assigned: {ts}, Due: {due}")
         if stat == "Pending":
             st.markdown("**Quiz** (pass with 80% or more)")
-            q1 = st.radio(f"1. What is the focus of {mod}?", ["Entertainment", "Policy enforcement", "Games"], key=f"{mod}_q1")
+            q1 = st.radio(f"1. What is the main purpose of {mod}?", ["Entertainment", "Policy enforcement", "Games"], key=f"{mod}_q1")
             q2 = st.radio("2. Who must comply with the policy?", ["Executives only", "Everyone", "No one"], key=f"{mod}_q2")
-            q3 = st.radio("3. When is review due?", ["Monthly", "Annually", "Never"], key=f"{mod}_q3")
+            q3 = st.radio("3. When is the review due?", ["Monthly", "Annually", "Never"], key=f"{mod}_q3")
             score = sum([q1 == "Policy enforcement", q2 == "Everyone", q3 == "Annually"])
             if score >= 2:
                 if st.button(f"Mark Completed - {mod}"):
@@ -153,4 +160,3 @@ elif choice == "Vision & Roadmap" and role == "Admin":
     - Phase 6: Add Alert Logic + Role-Specific Views 🔜
     - Phase 7: Secure Sign-In + Multi-Region Scaling 🔜
     """)
-
