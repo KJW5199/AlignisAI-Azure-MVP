@@ -52,7 +52,7 @@ conn.commit()
 # --- AZURE BLOB SETUP ---
 AZURE_CONNECTION_STRING = os.environ["AZURE_CONNECTION_STRING"]
 blob_service_client = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
-container_name = "policyfiles"
+container_name = "policy-files"
 container_client = blob_service_client.get_container_client(container_name)
 
 # --- SIDEBAR MENU ---
@@ -140,3 +140,4 @@ elif choice == "Vision & Roadmap" and role == "Admin":
     - Phase 6: Add Alert Logic + Role-Specific Views 🔜
     - Phase 7: Secure Sign-In + Multi-Region Scaling 🔜
     """)
+
