@@ -32,7 +32,7 @@ if not st.session_state.logged_in:
             st.session_state.logged_in = True
             st.session_state.role = user["role"]
             st.session_state.username = username
-            st.rerun()
+            st.experimental_rerun()
         else:
             st.error("Invalid credentials")
     st.stop()
