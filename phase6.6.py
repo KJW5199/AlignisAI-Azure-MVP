@@ -46,7 +46,7 @@ if st.sidebar.button("Logout"):
 conn = sqlite3.connect("kyc_training.db", check_same_thread=False)
 c = conn.cursor()
 c.execute('''CREATE TABLE IF NOT EXISTS audit_log (entry TEXT, timestamp TEXT)''')
-c.execute('''CREATE TABLE IF NOT EXISTS training_status (user TEXT, role TEXT, module TEXT, status TEXT, timestamp TEXT, due_date TEXT)''')
+c.execute('''CREATE TABLE IF NOT EXISTS training_status (user TEXT, role TEXT, module TEXT, status TEXT, timestamp TEXT, due_date TEXT, score INTEGER)''')
 conn.commit()
 
 # --- AZURE BLOB SETUP ---
@@ -97,12 +97,16 @@ elif choice == "AI Summary & Training":
     blobs = container_client.list_blobs()
     for blob in blobs:
         if blob.name.endswith(".txt"):
-            st.markdown(f"**{blob.name}**")
-            assign_to = st.selectbox("Assign to:", ["admin", "editor", "analyst"], key=blob.name)
-            if st.button(f"Assign Training - {blob.name}"):
+            st.markdown(f"### 📄 {blob.name}")
+            blob_client = container_client.get_blob_client(blob.name)
+            policy_text = blob_client.download_blob().readall().decode("utf-8")
+            st.text_area("Policy Text:", value=policy_text, height=200, disabled=(role not in ["Admin", "Editor"]))
+            editable_summary = st.text_area("AI-Generated Summary & Key Takeaways:", value="(Enter summary here)", height=150, disabled=(role not in ["Admin", "Editor"]), key=f"summary_{blob.name}")
+            assign_to = st.selectbox("Assign to:", ["admin", "editor", "analyst"], key=f"user_{blob.name}")
+            if st.button(f"Assign Training - {blob.name}", key=f"btn_{blob.name}"):
                 timestamp = datetime.datetime.now().isoformat()
                 due = (datetime.date.today() + datetime.timedelta(days=7)).isoformat()
-                c.execute("INSERT INTO training_status VALUES (?, ?, ?, ?, ?, ?)", (assign_to, users[assign_to]["role"], blob.name, "Pending", timestamp, due))
+                c.execute("INSERT INTO training_status VALUES (?, ?, ?, ?, ?, ?, ?)", (assign_to, users[assign_to]["role"], blob.name, "Pending", timestamp, due, 0))
                 c.execute("INSERT INTO audit_log VALUES (?, ?)", (f"Assigned {blob.name} to {assign_to}", timestamp))
                 conn.commit()
                 st.success(f"Training assigned to {assign_to}.")
@@ -115,11 +119,20 @@ elif choice == "User Portal":
     records = c.execute("SELECT module, status, timestamp, due_date FROM training_status WHERE user = ?", (username,)).fetchall()
     for mod, stat, ts, due in records:
         st.markdown(f"**{mod}** — *{stat}*, Assigned: {ts}, Due: {due}")
-        if stat == "Pending" and st.button(f"Mark Completed - {mod}"):
-            c.execute("UPDATE training_status SET status = 'Completed' WHERE user = ? AND module = ?", (username, mod))
-            c.execute("INSERT INTO audit_log VALUES (?, ?)", (f"{username} completed {mod}", datetime.datetime.now().isoformat()))
-            conn.commit()
-            st.success(f"Marked {mod} as completed.")
+        if stat == "Pending":
+            st.markdown("**Quiz** (pass with 80% or more)")
+            q1 = st.radio(f"1. What is the focus of {mod}?", ["Entertainment", "Policy enforcement", "Games"], key=f"{mod}_q1")
+            q2 = st.radio("2. Who must comply with the policy?", ["Executives only", "Everyone", "No one"], key=f"{mod}_q2")
+            q3 = st.radio("3. When is review due?", ["Monthly", "Annually", "Never"], key=f"{mod}_q3")
+            score = sum([q1 == "Policy enforcement", q2 == "Everyone", q3 == "Annually"])
+            if score >= 2:
+                if st.button(f"Mark Completed - {mod}"):
+                    c.execute("UPDATE training_status SET status = 'Completed', score = ? WHERE user = ? AND module = ?", (score, username, mod))
+                    c.execute("INSERT INTO audit_log VALUES (?, ?)", (f"{username} completed {mod} with score {score}/3", datetime.datetime.now().isoformat()))
+                    conn.commit()
+                    st.success(f"Marked {mod} as completed.")
+            else:
+                st.warning("You need 2 or more correct answers to pass.")
 
 # --- AUDIT LOG ---
 elif choice == "Audit Log":
