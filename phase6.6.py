@@ -6,6 +6,7 @@ import datetime
 import os
 from pathlib import Path
 from azure.storage.blob import BlobServiceClient
+from transformers import pipeline
 
 st.set_page_config(page_title="KYC Compliance MVP", layout="wide")
 
@@ -55,6 +56,9 @@ blob_service_client = BlobServiceClient.from_connection_string(AZURE_CONNECTION_
 container_name = "policy-files"
 container_client = blob_service_client.get_container_client(container_name)
 
+# --- SUMMARIZATION MODEL ---
+summarizer = pipeline("summarization")
+
 # --- SIDEBAR MENU ---
 role = st.session_state.role
 menu_options = ["Dashboard", "Upload Policies", "AI Summary & Training", "User Portal", "Audit Log"]
@@ -100,6 +104,7 @@ elif choice == "AI Summary & Training":
             st.markdown(f"### 📄 {blob.name}")
             blob_client = container_client.get_blob_client(blob.name)
             policy_text = blob_client.download_blob().readall().decode("utf-8")
+
             if role in ["Admin", "Editor"]:
                 edited_text = st.text_area("Edit Policy Text:", value=policy_text, height=200, key=f"edit_{blob.name}")
                 if st.button("Save Changes", key=f"save_{blob.name}"):
@@ -108,7 +113,15 @@ elif choice == "AI Summary & Training":
             else:
                 st.text_area("Policy Text:", value=policy_text, height=200, disabled=True)
 
-            editable_summary = st.text_area("AI-Generated Summary & Key Takeaways:", value="Bullet points of key takeaways go here...", height=150, disabled=(role not in ["Admin", "Editor"]), key=f"summary_{blob.name}")
+            # Generate AI summary and key takeaways from policy
+            with st.spinner("Generating AI Summary..."):
+                try:
+                    summary = summarizer(policy_text, max_length=120, min_length=30, do_sample=False)[0]['summary_text']
+                except Exception as e:
+                    summary = f"Error generating summary: {str(e)}"
+
+            st.text_area("AI-Generated Summary & Key Takeaways:", value=summary, height=150, disabled=True, key=f"summary_{blob.name}")
+
             assign_to = st.selectbox("Assign to:", ["admin", "editor", "analyst"], key=f"user_{blob.name}")
             if st.button(f"Assign Training - {blob.name}", key=f"btn_{blob.name}"):
                 timestamp = datetime.datetime.now().isoformat()
